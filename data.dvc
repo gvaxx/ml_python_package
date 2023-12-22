@@ -1,0 +1,6 @@
+outs:
+- md5: fe00fd2e43272eadfb5cf14333493feb.dir
+  size: 348477
+  nfiles: 1
+  hash: md5
+  path: data
