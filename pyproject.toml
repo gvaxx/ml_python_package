@@ -8,6 +8,7 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.11"
 dvc = "^3.36.0"
+dvc-gdrive = "^3.0.0"
 
 
 [tool.poetry.group.dev.dependencies]
