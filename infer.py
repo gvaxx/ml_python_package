@@ -1,45 +1,67 @@
+import logging
+import os
+from datetime import datetime
+
+import dvc.api
+import hydra
 import joblib
+import numpy as np
 import pandas as pd
+from omegaconf import DictConfig
+
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
 
-def load_model(filename="wine_quality_model.pkl"):
-    # Load the trained model from a file
-    model = joblib.load(filename)
-    return model
+def load_data_from_dvc(path):
+    logging.info("Loading inference data from DVC...")
+    with dvc.api.open(path=path, mode="r") as fd:
+        df = pd.read_csv(fd, sep=";")
+    return df
 
 
-def load_new_data():
-    url = "some/path"
-    data = pd.read_csv(url, delimiter=";")
-    return data
+def preprocess_data(data, scaler, target_column):
+    X = data.drop(target_column, axis=1)
+    X_scaled = scaler.transform(X)
+    return X_scaled
 
 
-def preprocess_data(data):
-    # Basic preprocessing for inference data
-    # Assuming the target column 'quality' is not in the inference dataset
-    X = data
-    return X
+def load_latest_model_and_scaler(
+    model_dir,
+    model_name,
+    scaler_name,
+):
+    logging.info("Loading latest model and scaler...")
+    model = joblib.load(f"{model_dir}/{model_name}")
+    scaler = joblib.load(f"{model_dir}/{scaler_name}")
+    return model, scaler
 
 
 def make_predictions(model, X):
-    # Make predictions using the loaded model
-    predictions = model.predict(X)
-    return predictions
+    return np.rint(model.predict(X))
 
 
-def save_predictions(predictions, filename="predictions.csv"):
-    # Save the predictions to a CSV file
-    pd.DataFrame(predictions, columns=["Predicted_Quality"]).to_csv(
-        filename, index=False
+def save_predictions(df, cfg):
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    inf_dir = cfg.model.inference_dir
+    if not os.path.exists(inf_dir):
+        os.makedirs(inf_dir)
+    path = os.path.join(inf_dir, f"predictions_{timestamp}.csv")
+    df.to_csv(path, index=False)
+
+
+@hydra.main(config_path="configs", config_name="config", version_base="1.3")
+def main(cfg: DictConfig):
+    df = load_data_from_dvc(cfg.data.inference_path)
+    model, scaler = load_latest_model_and_scaler(
+        cfg.model.dir, cfg.model.file_name, cfg.scaler.file_name
     )
-
-
-def main():
-    model = load_model()
-    new_data = load_new_data()
-    X = preprocess_data(new_data)
+    X = preprocess_data(df, scaler, cfg.data.target_column)
     predictions = make_predictions(model, X)
-    save_predictions(predictions)
+    df["predictions"] = predictions
+    save_predictions(df, cfg)
+    logging.info("Inference completed.")
 
 
 if __name__ == "__main__":
