@@ -17,6 +17,7 @@ tensorflow-macos = {version = "2.13", markers = "platform_system == \"Darwin\" a
 tensorflow-decision-forests = "1.5"
 mlflow = "^2.9.2"
 psycopg2 = "^2.9.9"
+argparse = "^1.4.0"
 
 
 [tool.poetry.group.dev.dependencies]

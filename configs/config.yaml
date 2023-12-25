@@ -1,4 +1,6 @@
 # configs/config.yaml
+defaults:
+  - command: null
 model:
   inference_dir: inference
   num_trials: 100
