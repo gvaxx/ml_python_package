@@ -1,7 +1,7 @@
 import hydra
 from omegaconf import DictConfig
 
-import mlops_project.mlops_project.train_rfr as train_rfr
+import mlops_project.train_rfr as train_rfr
 
 
 @hydra.main(config_path="configs", config_name="config", version_base="1.3")
