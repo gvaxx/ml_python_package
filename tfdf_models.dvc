@@ -1,6 +1,0 @@
-outs:
-- md5: ddc525a7e8502558204fe5880edaff28.dir
-  size: 8193
-  nfiles: 1
-  hash: md5
-  path: tfdf_models

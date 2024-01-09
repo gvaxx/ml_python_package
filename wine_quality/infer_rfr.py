@@ -1,12 +1,13 @@
 import logging
-import os
 from datetime import datetime
+from pathlib import Path, PurePath
 
 import dvc.api
-import joblib
+import hydra
 import numpy as np
 import pandas as pd
 from omegaconf import DictConfig
+from skops.io import load
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -32,8 +33,8 @@ def load_latest_model_and_scaler(
     scaler_name,
 ):
     logging.info("Loading latest model and scaler...")
-    model = joblib.load(f"{model_dir}/{model_name}")
-    scaler = joblib.load(f"{model_dir}/{scaler_name}")
+    model = load(f"{model_dir}/{model_name}")
+    scaler = load(f"{model_dir}/{scaler_name}")
     return model, scaler
 
 
@@ -44,12 +45,13 @@ def make_predictions(model, X):
 def save_predictions(df, cfg):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     inf_dir = cfg.model.inference_dir
-    if not os.path.exists(inf_dir):
-        os.makedirs(inf_dir)
-    path = os.path.join(inf_dir, f"predictions_{timestamp}.csv")
+    if not Path(inf_dir).exists():
+        (inf_dir)
+    path = PurePath(inf_dir, f"predictions_{timestamp}.csv")
     df.to_csv(path, index=False)
 
 
+@hydra.main(config_path="../configs", config_name="config", version_base="1.3")
 def main(cfg: DictConfig):
     df = load_data_from_dvc(cfg.data.inference_path)
     model, scaler = load_latest_model_and_scaler(

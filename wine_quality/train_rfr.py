@@ -1,18 +1,19 @@
 import logging
-import os
 import subprocess
 from datetime import datetime
+from pathlib import Path, PurePath
 
 import dvc.api
-import joblib
+import hydra
 import mlflow
 import pandas as pd
-import tensorflow as tf
 from omegaconf import DictConfig
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import RandomizedSearchCV, train_test_split
 from sklearn.preprocessing import MinMaxScaler
+from skops.io import dump
+from tensorboardX import SummaryWriter
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -54,19 +55,17 @@ def train_random_forest_model(X, y, cfg):
     logging.info("Setting up RandomForest model with hyperparameter tuning...")
     commit_id = get_git_commit_id()
     conf = cfg.model
-    rf = RandomForestRegressor(random_state=conf.random_state)
-
-    log_dir = os.path.join(
-        cfg.tensorboard.dir, datetime.now().strftime("%Y%m%d-%H%M%S")
-    )
-    writer = tf.summary.create_file_writer(log_dir)
+    rf = RandomForestClassifier(random_state=conf.random_state)
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    log_dir = PurePath(cfg.tensorboard.dir, timestamp)
+    writer = SummaryWriter(log_dir=log_dir)
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=conf.test_size, random_state=conf.random_state
     )
     param_distributions = {
-        "max_depth": list(conf.max_depth),
-        "min_samples_split": list(conf.min_samples_split),
-        "min_samples_leaf": list(conf.min_samples_leaf),
+        # "max_depth": list(conf.max_depth),
+        # "min_samples_split": list(conf.min_samples_split),
+        # "min_samples_leaf": list(conf.min_samples_leaf),
         "n_estimators": list(conf.n_estimators),
     }
     model = RandomizedSearchCV(
@@ -99,7 +98,7 @@ def train_random_forest_model(X, y, cfg):
     hyperparams = model.best_params_
     best_model = model.best_estimator_
     logging.info("Train model with best hyperparameters to calculate metrics")
-    model = RandomForestRegressor(**hyperparams)
+    model = RandomForestClassifier(**hyperparams)
     step = hyperparams["n_estimators"] // 10
     index = 0
     for n_estimators in range(1, hyperparams["n_estimators"] + 1, step):
@@ -110,26 +109,26 @@ def train_random_forest_model(X, y, cfg):
         mae = mean_absolute_error(y_test, predictions)
         r2 = r2_score(y_test, predictions)
 
-        with writer.as_default():
-            tf.summary.scalar("Mean Squared Error", mse, step=index)
-            tf.summary.scalar("Mean Absolure Error", mae, step=index)
-            tf.summary.scalar("R2 Score", r2, step=index)
-            writer.flush()
+        writer.add_scalar("Mean_Squared_Error", mse, index)
+        writer.add_scalar("Mean_Absolure_Error", mae, index)
+        writer.add_scalar("R2_Score", r2, index)
         index += 1
+    writer.flush()
 
     return best_model
 
 
 def save_model(model, scaler, cfg):
-    if not os.path.exists(cfg.model.dir):
-        os.makedirs(cfg.model.dir)
-    model_path = os.path.join(cfg.model.dir, cfg.model.file_name)
-    scaler_path = os.path.join(cfg.model.dir, cfg.scaler.file_name)
-    joblib.dump(model, model_path)
-    joblib.dump(scaler, scaler_path)
+    if not Path(cfg.model.dir).exists():
+        Path(cfg.model.dir).mkdir()
+    model_path = PurePath(cfg.model.dir).joinpath(cfg.model.file_name)
+    scaler_path = PurePath(cfg.model.dir).joinpath(cfg.scaler.file_name)
+    dump(model, model_path.as_posix())
+    dump(scaler, scaler_path.as_posix())
     return model_path, scaler_path
 
 
+@hydra.main(config_path="../configs", config_name="config", version_base="1.3")
 def main(cfg: DictConfig):
     df = load_data_from_dvc(cfg.data.train_path)
     X, y, scaler = preprocess_data(df, cfg.data.target_column)
