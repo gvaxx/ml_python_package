@@ -63,9 +63,9 @@ def train_random_forest_model(X, y, cfg):
         X, y, test_size=conf.test_size, random_state=conf.random_state
     )
     param_distributions = {
-        # "max_depth": list(conf.max_depth),
-        # "min_samples_split": list(conf.min_samples_split),
-        # "min_samples_leaf": list(conf.min_samples_leaf),
+        "max_depth": list(conf.max_depth),
+        "min_samples_split": list(conf.min_samples_split),
+        "min_samples_leaf": list(conf.min_samples_leaf),
         "n_estimators": list(conf.n_estimators),
     }
     model = RandomizedSearchCV(
